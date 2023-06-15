@@ -1,6 +1,8 @@
 import sqlite3
 import logging
 
+
+
 def create_diskusage_table(db_file):
     try:
         conn=sqlite3.connect(db_file)
@@ -64,3 +66,4 @@ def insert_cpuusage_data(db_file,data):
         conn.close()
     except Exception as e:
         logging.warning("DB Error, insert_cpuusage_data: " + str(e))
+
