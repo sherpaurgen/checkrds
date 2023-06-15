@@ -1,0 +1,6 @@
+Namespace: "AWS/RDS"
+
+Regions:
+  - "us-east-1"
+
+
