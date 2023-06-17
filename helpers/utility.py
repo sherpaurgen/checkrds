@@ -16,16 +16,15 @@ def list_available_db(region_name,Namespace):
                        "Engine": Engine, "region_name": region_name, "Namespace": Namespace})
     return (dblist)
 
-def get_rdsmemory_usage(data):
-    print('mem--------')
-    print(data)
+def get_rds_freeable_memory(dataref):
+    data = dataref.copy()
     client = boto3.client('cloudwatch',region_name=data["region_name"])
     end_time = datetime.utcnow()
     start_time = end_time - timedelta(minutes=5)
     queryparams = {
         'MetricDataQueries': [
             {
-                'Id': 'rds_memory_usage',
+                'Id': 'rds_memfreeable',
                 'MetricStat': {
                     'Metric': {
                         'Namespace': data['Namespace'],  # AWS/EC2
@@ -86,5 +85,40 @@ def get_cpu_usage(dataref):
     data["cpu_usage"] = cpuusage
     return(data)
 
-
+#DiskQueueDepth
+def get_rds_DiskQueueDepth(dataref):
+    data=dataref.copy()
+    client = boto3.client('cloudwatch',region_name=data["region_name"])
+    end_time = datetime.utcnow()
+    start_time = end_time - timedelta(minutes=5)
+    queryparams = {
+        'MetricDataQueries': [
+            {
+                'Id': 'rds_DiskQueueDepth',
+                'MetricStat': {
+                    'Metric': {
+                        'Namespace': data['Namespace'],  # AWS/EC2
+                        'MetricName': 'DiskQueueDepth',
+                        'Dimensions': [
+                            {
+                                'Name': 'DBInstanceIdentifier',
+                                'Value': data['DBInstanceIdentifier']
+                            }
+                        ]
+                    },
+                    'Period': 120,  # Fetch data in 120-second intervals
+                    'Stat': 'Average',  # Compute the average CPU usage
+                },
+            },
+        ],
+        'StartTime': start_time,
+        'EndTime': end_time,
+    }
+    response = client.get_metric_data(**queryparams)
+    if response["MetricDataResults"][0]["Values"]:
+        DiskQueueDepth = response["MetricDataResults"][0]["Values"][0]
+        if DiskQueueDepth > 0 and DiskQueueDepth < 1:
+            DiskQueueDepth=0
+    data["DiskQueueDepth"] = DiskQueueDepth
+    return (data)
 
