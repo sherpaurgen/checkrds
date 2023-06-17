@@ -15,8 +15,10 @@ def list_available_db(region_name,Namespace):
                        "DBInstanceClass": DBInstanceClass,
                        "Engine": Engine, "region_name": region_name, "Namespace": Namespace})
     return (dblist)
+
 def get_rdsmemory_usage(data):
-    Namespace = "FreeStorageSpace"
+    print('mem--------')
+    print(data)
     client = boto3.client('cloudwatch',region_name=data["region_name"])
     end_time = datetime.utcnow()
     start_time = end_time - timedelta(minutes=5)
@@ -45,8 +47,44 @@ def get_rdsmemory_usage(data):
     }
     response = client.get_metric_data(**queryparams)
     if response["MetricDataResults"][0]["Values"]:
-        cpuusage = response["MetricDataResults"][0]["Values"][0]
-    data["mem_usage"] = cpuusage
+        memfreeable = response["MetricDataResults"][0]["Values"][0]
+    memfreeable = memfreeable/(1024*1024)    # Bytes to MegaByte
+    data["memfreeable"] = memfreeable
     return (data)
+
+def get_cpu_usage(dataref):
+    data=dataref.copy() #the dataref is pass by reference ,using copy() to act as pass by reference
+    client = boto3.client('cloudwatch', region_name=data["region_name"])
+    end_time = datetime.utcnow()
+    start_time = end_time - timedelta(minutes=5)
+    queryparams = {
+        'MetricDataQueries': [
+            {
+                'Id': 'rds_cpu_usage',
+                'MetricStat': {
+                    'Metric': {
+                        'Namespace': data['Namespace'],  # AWS/EC2
+                        'MetricName': 'CPUUtilization',
+                        'Dimensions': [
+                            {
+                                'Name': 'DBInstanceIdentifier',
+                                'Value': data['DBInstanceIdentifier']
+                            }
+                        ]
+                    },
+                    'Period': 120,  # Fetch data in 120-second intervals
+                    'Stat': 'Average',  # Compute the average CPU usage
+                },
+            },
+        ],
+        'StartTime': start_time,
+        'EndTime': end_time,
+    }
+    response = client.get_metric_data(**queryparams)
+    if response["MetricDataResults"][0]["Values"]:
+        cpuusage = response["MetricDataResults"][0]["Values"][0]
+    data["cpu_usage"] = cpuusage
+    return(data)
+
 
 

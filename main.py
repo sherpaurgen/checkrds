@@ -1,6 +1,4 @@
 import concurrent.futures
-
-import boto3
 import time
 import yaml
 import os
@@ -10,7 +8,7 @@ from dbhandler.db import create_cpuusage_table
 from dbhandler.db import create_memusage_table
 from dbhandler.db import insert_cpuusage_data
 from helpers.utility import get_rdsmemory_usage
-from helpers.get_cpu import get_cpu_usage
+from helpers.utility import get_cpu_usage
 from helpers.utility import list_available_db
 
 
@@ -37,7 +35,10 @@ def main():
             if len(objlist) > 0:
                 for db in objlist:
                     alldb.append(db)
-
+    print("alldb")
+    print(alldb)
+    print("------------")
+    # alldb --
     # [{'DBInstanceIdentifier': 'database-1', 'AllocatedStorage': 20, 'DBInstanceClass': 'db.t3.micro', 'Engine': 'mysql', 'region_name': 'us-east-1', 'Namespace': 'AWS/RDS'}, {'DBInstanceIdentifier': 'pgsql-2', 'AllocatedStorage': 20, 'DBInstanceClass': 'db.t3.micro', 'Engine': 'postgres', 'region_name': 'us-east-1', 'Namespace': 'AWS/RDS'}]
     cpu_data = []
     with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -47,16 +48,17 @@ def main():
         for res in concurrent.futures.as_completed(futures):
             cpu_data.append(res.result())
     #cpu_data= [{'DBInstanceIdentifier': 'pgsql-2', 'AllocatedStorage': 20, 'DBInstanceClass': 'db.t3.micro', 'Engine': 'postgres', 'region_name': 'us-east-1', 'Namespace': 'AWS/RDS', 'cpu_usage': 5.366487783740542}
-
+    print(f"alldb after cpu: \n\n {alldb}:")
 
     for data in cpu_data:
         insert_cpuusage_data(dbfile, data)
 
+    # memory stat fetch starts here
     mem_data=[]
     with concurrent.futures.ThreadPoolExecutor() as executor:
         memfut=[]
-        for data in alldb:
-            memfut.append(executor.submit(get_rdsmemory_usage,data))
+        for d in alldb:
+            memfut.append(executor.submit(get_rdsmemory_usage,d))
         for res in concurrent.futures.as_completed(memfut):
             mem_data.append(res.result())
     print('---------------------------------------')
