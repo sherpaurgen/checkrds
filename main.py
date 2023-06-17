@@ -6,7 +6,10 @@ import yaml
 import os
 from concurrent.futures import ThreadPoolExecutor
 from dbhandler.db import create_diskusage_table
+from dbhandler.db import create_cpuusage_table
 from dbhandler.db import create_memusage_table
+from dbhandler.db import insert_cpuusage_data
+from helpers.utility import get_rdsmemory_usage
 from helpers.get_cpu import get_cpu_usage
 from helpers.utility import list_available_db
 
@@ -18,6 +21,7 @@ def main():
     dbfile = cwd + '/rds_stat.db'
     create_diskusage_table(dbfile)
     create_memusage_table(dbfile)
+    create_cpuusage_table(dbfile)
 
     with open(rds_conf_path, 'r') as fh:
         data = yaml.safe_load(fh)
@@ -35,12 +39,28 @@ def main():
                     alldb.append(db)
 
     # [{'DBInstanceIdentifier': 'database-1', 'AllocatedStorage': 20, 'DBInstanceClass': 'db.t3.micro', 'Engine': 'mysql', 'region_name': 'us-east-1', 'Namespace': 'AWS/RDS'}, {'DBInstanceIdentifier': 'pgsql-2', 'AllocatedStorage': 20, 'DBInstanceClass': 'db.t3.micro', 'Engine': 'postgres', 'region_name': 'us-east-1', 'Namespace': 'AWS/RDS'}]
+    cpu_data = []
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures=[]
         for data in alldb:
             futures.append(executor.submit(get_cpu_usage,data))
         for res in concurrent.futures.as_completed(futures):
-            print(res.result())
+            cpu_data.append(res.result())
+    #cpu_data= [{'DBInstanceIdentifier': 'pgsql-2', 'AllocatedStorage': 20, 'DBInstanceClass': 'db.t3.micro', 'Engine': 'postgres', 'region_name': 'us-east-1', 'Namespace': 'AWS/RDS', 'cpu_usage': 5.366487783740542}
+
+
+    for data in cpu_data:
+        insert_cpuusage_data(dbfile, data)
+
+    mem_data=[]
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        memfut=[]
+        for data in alldb:
+            memfut.append(executor.submit(get_rdsmemory_usage,data))
+        for res in concurrent.futures.as_completed(memfut):
+            mem_data.append(res.result())
+    print('---------------------------------------')
+    print(mem_data)
 
     end_time = time.time()
     execution_time = end_time - start_time

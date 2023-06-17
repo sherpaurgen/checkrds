@@ -61,7 +61,7 @@ def insert_cpuusage_data(db_file,data):
     try:
         cursor.execute(
             "INSERT INTO cpu_usage (DBInstanceIdentifier,Engine,CpuUsage,region_name) VALUES (?, ?, ?, ?)",
-            (data["DBInstanceIdentifier"], data["Engine"], data["CpuUsage"], data["region_name"]))
+            (data["DBInstanceIdentifier"], data["Engine"], data["cpu_usage"], data["region_name"]))
         conn.commit()
         conn.close()
     except Exception as e:
