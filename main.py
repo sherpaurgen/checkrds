@@ -2,17 +2,18 @@ import concurrent.futures
 import time
 import yaml
 import os
-from dbhandler.db import create_diskusage_table
+from dbhandler.db import create_diskfree_table,insert_diskfree_data
 from dbhandler.db import create_cpuusage_table
-from dbhandler.db import create_memusage_table
+from dbhandler.db import create_memfree_table
 from dbhandler.db import insert_cpuusage_data
 from dbhandler.db import insert_memfree_data
 from dbhandler.db import create_diskqueuedepth_table
 from dbhandler.db import insert_diskqueuedepth_data
+from dbhandler.db import truncate_tables
 from helpers.utility import get_rds_freeable_memory
 from helpers.utility import get_cpu_usage
 from helpers.utility import list_available_db
-from helpers.utility import get_rds_DiskQueueDepth
+from helpers.utility import get_rds_DiskQueueDepth,get_rds_diskfree
 
 
 def main():
@@ -20,11 +21,11 @@ def main():
     cwd = os.getcwd()
     rds_conf_path = cwd + '/config/rds.yaml'
     dbfile = cwd + '/rds_stat.db'
-    create_diskusage_table(dbfile)
-    create_memusage_table(dbfile)
+    create_diskfree_table(dbfile)
+    create_memfree_table(dbfile)
     create_cpuusage_table(dbfile)
     create_diskqueuedepth_table(dbfile)
-
+    truncate_tables(dbfile)
     with open(rds_conf_path, 'r') as fh:
         data = yaml.safe_load(fh)
     Namespace = data["Namespace"]
@@ -74,6 +75,19 @@ def main():
             diskqueue.append(res.result())
     for d in diskqueue:
         insert_diskqueuedepth_data(dbfile,d)
+
+    diskfreequeue=[]
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        diskFut = []
+        for d in alldb:
+            diskFut.append(executor.submit(get_rds_diskfree, d))
+        for res in concurrent.futures.as_completed(diskFut):
+            diskfreequeue.append(res.result())
+
+    for d in diskfreequeue:
+        insert_diskfree_data(dbfile, d) # free disk space is in MB
+
+
 
     end_time = time.time()
     execution_time = end_time - start_time

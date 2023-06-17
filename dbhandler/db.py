@@ -3,15 +3,15 @@ import logging
 
 
 
-def create_diskusage_table(db_file):
+def create_diskfree_table(db_file):
     try:
         conn=sqlite3.connect(db_file)
         cursor = conn.cursor()
-        cursor.execute('''CREATE TABLE IF NOT EXISTS disk_usage (
+        cursor.execute('''CREATE TABLE IF NOT EXISTS disk_free (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
                                 DBInstanceIdentifier TEXT,
                                 Engine TEXT,
-                                DiskUsage REAL,
+                                disk_free REAL,
                                 region_name TEXT,
                                 updatedat CURRENT_TIMESTAMP
                             )''')
@@ -19,6 +19,19 @@ def create_diskusage_table(db_file):
         conn.close()
     except Exception as e:
         logging.warning("DB Error, create_diskusage_table: " + str(e))
+
+def insert_diskfree_data(db_file,data):
+    conn = sqlite3.connect(db_file)
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO disk_free (DBInstanceIdentifier,Engine,disk_free,region_name) VALUES (?, ?, ?, ?)",
+            (data["DBInstanceIdentifier"], data["Engine"], data["FreeStorageSpace"], data["region_name"]))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logging.warning("DB Error, insert_diskfree_data: " + str(e))
+
 
 def create_cpuusage_table(db_file):
     try:
@@ -54,11 +67,11 @@ def create_diskqueuedepth_table(db_file):
     except Exception as e:
         logging.warning("DB Error, create_diskqueuedepth_table: " + str(e))
 
-def create_memusage_table(db_file):
+def create_memfree_table(db_file):
     try:
         conn = sqlite3.connect(db_file)
         cursor = conn.cursor()
-        cursor.execute('''CREATE TABLE IF NOT EXISTS mem_usage (
+        cursor.execute('''CREATE TABLE IF NOT EXISTS mem_free (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
                                 DBInstanceIdentifier TEXT,
                                 Engine TEXT,
@@ -100,10 +113,20 @@ def insert_memfree_data(db_file,data):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO mem_usage (DBInstanceIdentifier,Engine,MemUsage,region_name) VALUES (?, ?, ?, ?)",
+            "INSERT INTO mem_free (DBInstanceIdentifier,Engine,MemUsage,region_name) VALUES (?, ?, ?, ?)",
             (data["DBInstanceIdentifier"], data["Engine"], data["memfreeable"], data["region_name"]))
         conn.commit()
         conn.close()
     except Exception as e:
         logging.warning("DB Error, insert_memFreeable_data: " + str(e))
+
+def truncate_tables(db_file):
+    conn = sqlite3.connect(db_file)
+    cursor = conn.cursor()
+    table_names = ['mem_free','cpu_usage','diskqueuedepth',]
+    for t in table_names:
+        cursor.execute(f"DELETE FROM {t}")
+    conn.commit()
+    cursor.close()
+    conn.close()
 

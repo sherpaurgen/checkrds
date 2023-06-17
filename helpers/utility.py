@@ -122,3 +122,39 @@ def get_rds_DiskQueueDepth(dataref):
     data["DiskQueueDepth"] = DiskQueueDepth
     return (data)
 
+def get_rds_diskfree(dataref):
+    data=dataref.copy()
+    client = boto3.client('cloudwatch',region_name=data["region_name"])
+    end_time = datetime.utcnow()
+    start_time = end_time - timedelta(minutes=5)
+    queryparams = {
+        'MetricDataQueries': [
+            {
+                'Id': 'rds_DiskFree',
+                'MetricStat': {
+                    'Metric': {
+                        'Namespace': data['Namespace'],  # AWS/EC2
+                        'MetricName': 'FreeStorageSpace',
+                        'Dimensions': [
+                            {
+                                'Name': 'DBInstanceIdentifier',
+                                'Value': data['DBInstanceIdentifier']
+                            }
+                        ]
+                    },
+                    'Period': 120,  # Fetch data in 120-second intervals
+                    'Stat': 'Average',  # Compute the average CPU usage
+                },
+            },
+        ],
+        'StartTime': start_time,
+        'EndTime': end_time,
+    }
+    response = client.get_metric_data(**queryparams)
+    if response["MetricDataResults"][0]["Values"]:
+        FreeStorageSpace = response["MetricDataResults"][0]["Values"][0]
+        data["FreeStorageSpace"] = FreeStorageSpace/(1024*1024*1024) # free disk space is Byte hence convert to GB
+        # aws CW uses 1000 instead of 1024
+    else:
+        data["FreeStorageSpace"] = 0
+    return data
