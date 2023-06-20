@@ -7,13 +7,14 @@ from dbhandler.db import create_cpuusage_table
 from dbhandler.db import create_memfree_table
 from dbhandler.db import insert_cpuusage_data
 from dbhandler.db import insert_memfree_data
-from dbhandler.db import create_diskqueuedepth_table
-from dbhandler.db import insert_diskqueuedepth_data
+from dbhandler.db import create_diskqueuedepth_table,create_elbresponsetime_table
+from dbhandler.db import insert_diskqueuedepth_data,insert_elbresponsetime_data
 from dbhandler.db import truncate_tables
 from helpers.utility import get_rds_freeable_memory
 from helpers.utility import get_cpu_usage
 from helpers.utility import list_available_db
 from helpers.utility import get_rds_DiskQueueDepth,get_rds_diskfree
+from helpers.utility import list_elb,getTargetResponseTime
 
 
 def main():
@@ -25,13 +26,14 @@ def main():
     create_memfree_table(dbfile)
     create_cpuusage_table(dbfile)
     create_diskqueuedepth_table(dbfile)
+    create_elbresponsetime_table(dbfile)
     truncate_tables(dbfile)
     with open(rds_conf_path, 'r') as fh:
         data = yaml.safe_load(fh)
-    Namespace = data["Namespace"]
+    Namespace = data["Rds_Namespace"]
     tmp_alldb = []
 
-    for region in data['Regions']:
+    for region in data['Rds_Regions']:
         tmp_alldb.append(list_available_db(region, Namespace))
     alldb = []
 
@@ -75,7 +77,6 @@ def main():
             diskqueue.append(res.result())
     for d in diskqueue:
         insert_diskqueuedepth_data(dbfile,d)
-
     diskfreequeue=[]
     with concurrent.futures.ThreadPoolExecutor() as executor:
         diskFut = []
@@ -87,12 +88,39 @@ def main():
     for d in diskfreequeue:
         insert_diskfree_data(dbfile, d) # free disk space is in MB
 
+    #------------ELB Monitring Start --------#
+    with open(rds_conf_path, 'r') as fh:
+        data = yaml.safe_load(fh)
+    Namespace = data["Elb_Namespace"]
+    tmp_allelb = []
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        elbfut=[]
+        for region in data['Elb_Regions']:
+            elbfut.append(executor.submit(list_elb,region))
+        for item in concurrent.futures.as_completed(elbfut):
+            tmp_allelb.append(item.result())
+    #
+    elbseries=[]
+    for regionelblist in tmp_allelb:
+        for item in regionelblist:
+            elbseries.append(item)
+    elbdata=[]
+    elbfut=[]
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        for elb in elbseries:
+            elb['Namespace'] = Namespace
+            elbfut.append(executor.submit(getTargetResponseTime,**elb))
+        for item in concurrent.futures.as_completed(elbfut):
+            elbdata.append(item.result())
+
+    print(elbdata)
+    for item in elbdata:
+        insert_elbresponsetime_data(dbfile,item)
 
 
     end_time = time.time()
     execution_time = end_time - start_time
     print(f"Elapsed: {execution_time}s")
-
 
 if __name__ == '__main__':
     main()

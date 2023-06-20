@@ -14,6 +14,7 @@ def list_available_db(region_name,Namespace):
         dblist.append({"DBInstanceIdentifier": DBInstanceIdentifier, "AllocatedStorage": AllocatedStorage,
                        "DBInstanceClass": DBInstanceClass,
                        "Engine": Engine, "region_name": region_name, "Namespace": Namespace})
+
     return (dblist)
 
 def get_rds_freeable_memory(dataref):
@@ -47,8 +48,11 @@ def get_rds_freeable_memory(dataref):
     response = client.get_metric_data(**queryparams)
     if response["MetricDataResults"][0]["Values"]:
         memfreeable = response["MetricDataResults"][0]["Values"][0]
-    memfreeable = memfreeable/(1024*1024)    # Bytes to MegaByte
-    data["memfreeable"] = memfreeable
+        memfreeable = memfreeable/(1024*1024)    # Bytes to MegaByte
+        data["memfreeable"] = memfreeable
+    else:
+        data["memfreeable"] = -1
+
     return (data)
 
 def get_cpu_usage(dataref):
@@ -82,7 +86,9 @@ def get_cpu_usage(dataref):
     response = client.get_metric_data(**queryparams)
     if response["MetricDataResults"][0]["Values"]:
         cpuusage = response["MetricDataResults"][0]["Values"][0]
-    data["cpu_usage"] = cpuusage
+        data["cpu_usage"] = cpuusage
+    else:
+        data["cpu_usage"] = 0
     return(data)
 
 #DiskQueueDepth
@@ -115,12 +121,14 @@ def get_rds_DiskQueueDepth(dataref):
         'EndTime': end_time,
     }
     response = client.get_metric_data(**queryparams)
-    if response["MetricDataResults"][0]["Values"]:
+    if not response["MetricDataResults"][0]["Values"]:
+        data["DiskQueueDepth"] = -1  # set disk queue/outstanding reques to -1 if this data is not present: this happens if RDS db is stopped
+    elif response["MetricDataResults"][0]["Values"]:
         DiskQueueDepth = response["MetricDataResults"][0]["Values"][0]
+        data["DiskQueueDepth"] = DiskQueueDepth
         if DiskQueueDepth > 0 and DiskQueueDepth < 1:
-            DiskQueueDepth=0
-    data["DiskQueueDepth"] = DiskQueueDepth
-    return (data)
+            data["DiskQueueDepth"] = 0
+    return data
 
 def get_rds_diskfree(dataref):
     data=dataref.copy()
@@ -158,3 +166,53 @@ def get_rds_diskfree(dataref):
     else:
         data["FreeStorageSpace"] = 0
     return data
+
+def list_elb(region_name):
+    elblist=[]
+    try:
+        client = boto3.client('elbv2',region_name=region_name)
+        response = client.describe_load_balancers()
+        for resp in response['LoadBalancers']:
+            LoadBalancerArn=resp['LoadBalancerArn']
+            DNSName=resp['DNSName']
+            LoadBalancerName=resp['LoadBalancerName']
+            VpcId=resp['VpcId']
+            State=resp['State']['Code']
+            Type=resp['Type']
+            AvailabilityZones=resp['AvailabilityZones']
+            elblist.append({"LoadBalancerArn":LoadBalancerArn,"LoadBalancerName":LoadBalancerName,"DNSName":DNSName,"AvailabilityZones":AvailabilityZones,"region_name":region_name,
+                            "VpcId":VpcId,"Type":Type,"State":State})
+    except Exception as e:
+        print(e)
+    return elblist
+
+def getTargetResponseTime(**kwargsref):
+    kwargs=kwargsref.copy()
+    cloudwatch = boto3.client('cloudwatch', region_name=kwargs['region_name'])
+    end_time = datetime.utcnow()
+    start_time = end_time - timedelta(minutes=10)
+    load_balancer_name = '/'.join(kwargs['LoadBalancerArn'].split('/')[-3:])
+    dimensions = [
+        {
+            'Name': 'LoadBalancer',
+            'Value': load_balancer_name
+        }
+    ]
+    response = cloudwatch.get_metric_statistics(
+        Namespace='AWS/ApplicationELB',
+        MetricName='TargetResponseTime',
+        Dimensions=dimensions,
+        StartTime=start_time,
+        EndTime=end_time,
+        Period=60,
+        Statistics=['Average']
+    )
+
+    if 'Datapoints' in response:
+        datapoints = response['Datapoints']
+        if len(datapoints) > 0:
+            avg_response_time = datapoints[-1]['Average']
+            kwargs['avg_response_time'] = avg_response_time
+        else:
+            kwargs['avg_response_time'] = -1  # if there is no request made to ELB then its -1
+    return kwargs

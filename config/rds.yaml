@@ -1,6 +1,9 @@
-Namespace: "AWS/RDS"
+Rds_Namespace: "AWS/RDS"
+Rds_Regions:
+  - "us-east-1"
 
-Regions:
+Elb_Namespace: "AWS/ApplicationELB"
+Elb_Regions:
   - "us-east-1"
 
 
