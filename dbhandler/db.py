@@ -11,6 +11,7 @@ def create_diskfree_table(db_file):
         id INTEGER PRIMARY KEY AUTOINCREMENT,
                                 DBInstanceIdentifier TEXT,
                                 Engine TEXT,
+                                DBInstanceStatus TEXT,
                                 disk_free REAL,
                                 region_name TEXT,
                                 updatedat CURRENT_TIMESTAMP
@@ -25,8 +26,8 @@ def insert_diskfree_data(db_file,data):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO disk_free (DBInstanceIdentifier,Engine,disk_free,region_name) VALUES (?, ?, ?, ?)",
-            (data["DBInstanceIdentifier"], data["Engine"], data["FreeStorageSpace"], data["region_name"]))
+            "INSERT INTO disk_free (DBInstanceIdentifier,Engine,DBInstanceStatus,disk_free,region_name) VALUES (?, ?,?, ?, ?)",
+            (data["DBInstanceIdentifier"], data["Engine"],data["DBInstanceStatus"], data["FreeStorageSpace"], data["region_name"]))
         conn.commit()
         conn.close()
     except Exception as e:
@@ -41,6 +42,7 @@ def create_cpuusage_table(db_file):
         id INTEGER PRIMARY KEY AUTOINCREMENT,
                                 DBInstanceIdentifier TEXT,
                                 Engine TEXT,
+                                DBInstanceStatus TEXT,
                                 CpuUsage REAL,
                                 region_name TEXT,
                                 updatedat CURRENT_TIMESTAMP
@@ -52,12 +54,13 @@ def create_cpuusage_table(db_file):
 
 def create_diskqueuedepth_table(db_file):
     try:
-        conn=sqlite3.connect(db_file)
+        conn = sqlite3.connect(db_file)
         cursor = conn.cursor()
         cursor.execute('''CREATE TABLE IF NOT EXISTS diskqueuedepth (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
                                 DBInstanceIdentifier TEXT,
                                 Engine TEXT,
+                                DBInstanceStatus TEXT,
                                 diskqueuedepth REAL,
                                 region_name TEXT,
                                 updatedat CURRENT_TIMESTAMP
@@ -75,6 +78,7 @@ def create_memfree_table(db_file):
         id INTEGER PRIMARY KEY AUTOINCREMENT,
                                 DBInstanceIdentifier TEXT,
                                 Engine TEXT,
+                                DBInstanceStatus TEXT,
                                 MemUsage REAL,
                                 region_name TEXT,
                                 updatedat CURRENT_TIMESTAMP
@@ -89,8 +93,8 @@ def insert_cpuusage_data(db_file,data):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO cpu_usage (DBInstanceIdentifier,Engine,CpuUsage,region_name) VALUES (?, ?, ?, ?)",
-            (data["DBInstanceIdentifier"], data["Engine"], data["cpu_usage"], data["region_name"]))
+            "INSERT INTO cpu_usage (DBInstanceIdentifier,Engine,DBInstanceStatus,CpuUsage,region_name) VALUES (?,?, ?, ?, ?)",
+            (data["DBInstanceIdentifier"], data["Engine"],data["DBInstanceStatus"], data["cpu_usage"], data["region_name"]))
         conn.commit()
         conn.close()
     except Exception as e:
@@ -101,8 +105,8 @@ def insert_diskqueuedepth_data(db_file,data):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO diskqueuedepth (DBInstanceIdentifier,Engine,diskqueuedepth,region_name) VALUES (?, ?, ?, ?)",
-            (data["DBInstanceIdentifier"], data["Engine"], data["DiskQueueDepth"], data["region_name"]))
+            "INSERT INTO diskqueuedepth (DBInstanceIdentifier,Engine,DBInstanceStatus,diskqueuedepth,region_name) VALUES (?,?, ?, ?, ?)",
+            (data["DBInstanceIdentifier"], data["Engine"],data["DBInstanceStatus"], data["DiskQueueDepth"], data["region_name"]))
         conn.commit()
         conn.close()
     except Exception as e:
@@ -113,8 +117,8 @@ def insert_memfree_data(db_file,data):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO mem_free (DBInstanceIdentifier,Engine,MemUsage,region_name) VALUES (?, ?, ?, ?)",
-            (data["DBInstanceIdentifier"], data["Engine"], data["memfreeable"], data["region_name"]))
+            "INSERT INTO mem_free (DBInstanceIdentifier,Engine,DBInstanceStatus,MemUsage,region_name) VALUES (?,?, ?, ?, ?)",
+            (data["DBInstanceIdentifier"], data["Engine"],data["DBInstanceStatus"], data["memfreeable"], data["region_name"]))
         conn.commit()
         conn.close()
     except Exception as e:

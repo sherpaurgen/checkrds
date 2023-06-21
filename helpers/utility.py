@@ -10,9 +10,10 @@ def list_available_db(region_name,Namespace):
         DBInstanceClass = db_instance["DBInstanceClass"]
         Engine = db_instance["Engine"]
         AllocatedStorage = db_instance["AllocatedStorage"]
+        DBInstanceStatus = db_instance["DBInstanceStatus"]
         region_name = region_name
         dblist.append({"DBInstanceIdentifier": DBInstanceIdentifier, "AllocatedStorage": AllocatedStorage,
-                       "DBInstanceClass": DBInstanceClass,
+                       "DBInstanceClass": DBInstanceClass,"DBInstanceStatus":DBInstanceStatus,
                        "Engine": Engine, "region_name": region_name, "Namespace": Namespace})
 
     return (dblist)
@@ -182,6 +183,7 @@ def list_elb(region_name):
             AvailabilityZones=resp['AvailabilityZones']
             elblist.append({"LoadBalancerArn":LoadBalancerArn,"LoadBalancerName":LoadBalancerName,"DNSName":DNSName,"AvailabilityZones":AvailabilityZones,"region_name":region_name,
                             "VpcId":VpcId,"Type":Type,"State":State})
+            #State can be active | provisioning | active_impaired | failed
     except Exception as e:
         print(e)
     return elblist
@@ -190,7 +192,7 @@ def getTargetResponseTime(**kwargsref):
     kwargs=kwargsref.copy()
     cloudwatch = boto3.client('cloudwatch', region_name=kwargs['region_name'])
     end_time = datetime.utcnow()
-    start_time = end_time - timedelta(minutes=10)
+    start_time = end_time - timedelta(minutes=5)
     load_balancer_name = '/'.join(kwargs['LoadBalancerArn'].split('/')[-3:])
     dimensions = [
         {
@@ -204,7 +206,7 @@ def getTargetResponseTime(**kwargsref):
         Dimensions=dimensions,
         StartTime=start_time,
         EndTime=end_time,
-        Period=60,
+        Period=120,
         Statistics=['Average']
     )
 
@@ -214,5 +216,5 @@ def getTargetResponseTime(**kwargsref):
             avg_response_time = datapoints[-1]['Average']
             kwargs['avg_response_time'] = avg_response_time
         else:
-            kwargs['avg_response_time'] = -1  # if there is no request made to ELB then its -1
+            kwargs['avg_response_time'] = -1  # if there is no request made to ELB or the targets are unavailable then its value -1
     return kwargs
