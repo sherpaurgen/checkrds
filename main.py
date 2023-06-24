@@ -126,16 +126,18 @@ def main():
             tgtdata.append(f.result())
 
     unhealthycount=[]
-
-    for item in tgtdata:
-        if item['target_groups']:
-            for tgt in item['target_groups']:
-                tgtname = 'targetgroup/'+'/'.join(tgt["TargetGroupArn"].split('/')[-2:])
-                load_balancer_name = '/'.join(item["alb_arn"].split('/')[-3:])
-                res=getUnHealthyHostCount(tgtname, load_balancer_name, item["region_name"], item['State'],item["LoadBalancerName"])
-                unhealthycount.append(res)
-        else:
-            continue
+    fut = []
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        for item in tgtdata:
+            if item['target_groups']:
+                for tgt in item['target_groups']:
+                    tgtname = 'targetgroup/'+'/'.join(tgt["TargetGroupArn"].split('/')[-2:])
+                    load_balancer_name = '/'.join(item["alb_arn"].split('/')[-3:])
+                    fut.append(executor.submit(getUnHealthyHostCount,tgtname, load_balancer_name, item["region_name"], item['State'],item["LoadBalancerName"]))
+                for f in concurrent.futures.as_completed(fut):
+                    unhealthycount.append(f.result())
+            else:
+                continue
 
     for x in unhealthycount:
         insert_elbtargetgroup_data(dbfile,x)
