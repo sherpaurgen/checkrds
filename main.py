@@ -2,6 +2,7 @@ import concurrent.futures
 import time
 import yaml
 import os
+import logging
 from dbhandler.db import create_diskfree_table,insert_diskfree_data
 from dbhandler.db import create_cpuusage_table
 from dbhandler.db import create_memfree_table
@@ -15,8 +16,11 @@ from helpers.utility import get_cpu_usage
 from helpers.utility import list_available_db
 from helpers.utility import get_rds_DiskQueueDepth,get_rds_diskfree
 from helpers.utility import list_elb,getTargetResponseTime,get_target_groups_for_alb,getUnHealthyHostCount
-from helpers.utility import generate_rdshost_file,generate_elbhost_file,truncate_file
+from helpers.utility import generate_rdshost_file,generate_elbhost_file,truncate_file,reloadIcinga
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
+logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S', level=logging.WARNING)
 
 def main():
     script_home = os.path.dirname(os.path.abspath(__file__))
@@ -153,10 +157,11 @@ def main():
     truncate_file(icinga_elb_hostfilepath)
     generate_rdshost_file(icinga_rds_hostfilepath,rdshosttemplatepath,dbfile)
     generate_elbhost_file(icinga_elb_hostfilepath,elbhosttemplatepath,dbfile)
+    reloadIcinga()
 
     end_time = time.time()
     execution_time = end_time - start_time
-    print(f"Elapsed: {execution_time}s")
+    logger.warning(f"Elapsed: {execution_time}s")
 
 if __name__ == '__main__':
     main()
