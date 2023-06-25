@@ -1,0 +1,12 @@
+icinga_rds_hostfilepath: "/Users/ush/PycharmProjects/Helper_v2/config/rdshost.conf"
+icinga_elb_hostfilepath: "/Users/ush/PycharmProjects/Helper_v2/config/albhost.conf"
+rdshosttemplatepath: "/Users/ush/PycharmProjects/Helper_v2/config/template_rds.j2"
+elbhosttemplatepath: "/Users/ush/PycharmProjects/Helper_v2/config/template_elb.j2"
+Rds_Namespace: "AWS/RDS"
+Rds_Regions:
+  - "us-east-1"
+
+Elb_Namespace: "AWS/ApplicationELB"
+Elb_Regions:
+  - "us-east-1"
+

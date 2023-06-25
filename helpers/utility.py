@@ -1,5 +1,8 @@
 import boto3
 from datetime import datetime,timedelta
+import sqlite3
+from jinja2 import Template
+import subprocess
 
 def list_available_db(region_name,Namespace):
     dblist = []
@@ -258,3 +261,37 @@ def getUnHealthyHostCount(tgtarn,albname,region_name,state,LoadBalancerName):
     else:
         dp = -1
     return { "unhealthycount":dp,"State":state,"alb_arn":albname,"region_name":region_name,"tgtarn":tgtarn,"LoadBalancerName":LoadBalancerName }
+
+def generate_rdshost_file(icingahostfilepath, hosttemplatepath,dbfile):
+    con = sqlite3.connect(dbfile)
+    cursor = con.cursor()
+    cursor.execute('SELECT DBInstanceIdentifier,Engine,region_name FROM cpu_usage')
+    rows = cursor.fetchall()
+    with open(hosttemplatepath, 'r') as file:
+        template_content = file.read()
+    template = Template(template_content)
+    for row in rows:
+        rendered_template = template.render(hostname=row[0], engine=row[1], region_name=row[2])
+        with open(icingahostfilepath, 'a') as output_file:
+            output_file.write(rendered_template)
+    cursor.close()
+    con.close()
+def generate_elbhost_file(icingahostfilepath, hosttemplatepath,dbfile):
+    con = sqlite3.connect(dbfile)
+    cursor = con.cursor()
+    cursor.execute('SELECT LoadBalancerName,DNSName,elbState,region_name FROM elbresponsetime')
+    rows = cursor.fetchall()
+    with open(hosttemplatepath, 'r') as file:
+        template_content = file.read()
+    template = Template(template_content)
+    for row in rows:
+        rendered_template = template.render(hostname=row[0], address=row[1],state=row[2], region_name=row[3])
+        with open(icingahostfilepath, 'a') as output_file:
+            output_file.write(rendered_template)
+    cursor.close()
+    con.close()
+
+def truncate_file(filepath):
+    with open(filepath, 'w') as file:
+        file.truncate()
+    subprocess.call(['chmod', '0644', filepath])
