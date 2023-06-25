@@ -1,8 +1,6 @@
 import sqlite3
 import logging
 
-
-
 def create_diskfree_table(db_file):
     try:
         conn=sqlite3.connect(db_file)
@@ -141,6 +139,38 @@ def create_elbresponsetime_table(db_file):
         conn.close()
     except Exception as e:
         logging.warning("DB Error, create_elbresponsetime_table: " + str(e))
+
+def create_elbtargetgroup_table(db_file):
+    try:
+        conn=sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS elbtargetgroup (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                LoadBalancerName TEXT,
+                                targetgroup TEXT,
+                                region_name TEXT,
+                                alb_arn TEXT,
+                                elbState TEXT,
+                                unhealthycount REAL,
+                                updatedat CURRENT_TIMESTAMP
+                            )''')
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logging.warning("DB Error, create_elbtargetgroup_table: " + str(e))
+
+def insert_elbtargetgroup_data(db_file,data):
+    conn = sqlite3.connect(db_file)
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO elbtargetgroup (LoadBalancerName,targetgroup,region_name,alb_arn,elbState,unhealthycount) VALUES (?, ?, ?, ?,?,? )",
+            (data["LoadBalancerName"], data["tgtarn"], data["region_name"], data["alb_arn"],data["State"],data["unhealthycount"]))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logging.warning("DB Error, insert_elbtargetgroup_data: " + str(e))
+
 def insert_elbresponsetime_data(db_file,data):
     conn = sqlite3.connect(db_file)
     cursor = conn.cursor()
@@ -151,12 +181,12 @@ def insert_elbresponsetime_data(db_file,data):
         conn.commit()
         conn.close()
     except Exception as e:
-        logging.warning("DB Error, insert_memFreeable_data: " + str(e))
+        logging.warning("DB Error, insert_elbresponsetime_data: " + str(e))
 
 def truncate_tables(db_file):
     conn = sqlite3.connect(db_file)
     cursor = conn.cursor()
-    table_names = ['mem_free','cpu_usage','diskqueuedepth','elbresponsetime']
+    table_names = ['mem_free','cpu_usage','diskqueuedepth','elbresponsetime','elbtargetgroup']
     for t in table_names:
         cursor.execute(f"DELETE FROM {t}")
     conn.commit()

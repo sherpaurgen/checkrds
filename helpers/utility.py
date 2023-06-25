@@ -3,7 +3,7 @@ from datetime import datetime,timedelta
 
 def list_available_db(region_name,Namespace):
     dblist = []
-    client = boto3.client('rds', region_name="us-east-1")
+    client = boto3.client('rds', region_name=region_name)
     response = client.describe_db_instances()
     for db_instance in response['DBInstances']:
         DBInstanceIdentifier = db_instance["DBInstanceIdentifier"]
@@ -189,7 +189,7 @@ def list_elb(region_name):
     return elblist
 
 def getTargetResponseTime(**kwargsref):
-    kwargs=kwargsref.copy()
+    kwargs = kwargsref.copy()
     cloudwatch = boto3.client('cloudwatch', region_name=kwargs['region_name'])
     end_time = datetime.utcnow()
     start_time = end_time - timedelta(minutes=5)
@@ -218,3 +218,43 @@ def getTargetResponseTime(**kwargsref):
         else:
             kwargs['avg_response_time'] = -1  # if there is no request made to ELB or the targets are unavailable then its value -1
     return kwargs
+
+
+def get_target_groups_for_alb(alb_arn,region_name,LoadBalancerName,lbState):
+    elbv2_client = boto3.client('elbv2',region_name=region_name)
+    response = elbv2_client.describe_target_groups(
+        LoadBalancerArn=alb_arn
+    )
+    target_groups = response['TargetGroups']
+    data = { "target_groups":target_groups, "region_name":region_name, "LoadBalancerName":LoadBalancerName,"alb_arn":alb_arn,"State":lbState }
+    return data
+
+def getUnHealthyHostCount(tgtarn,albname,region_name,state,LoadBalancerName):
+    cloudwatch = boto3.client('cloudwatch',region_name=region_name)
+    end_time = datetime.utcnow()
+    start_time = end_time - timedelta(minutes=10)
+    dimensions = [
+        {
+            "Name": "TargetGroup",
+            "Value": tgtarn
+        },
+        {
+            "Name": "LoadBalancer",
+            "Value": albname
+        }
+    ]
+    response = cloudwatch.get_metric_statistics(
+        Namespace='AWS/ApplicationELB',
+        MetricName='UnHealthyHostCount',
+        Dimensions=dimensions,
+        StartTime=start_time,
+        EndTime=end_time,
+        Period=120,
+        Statistics=['Average']
+    )
+
+    if response['Datapoints']:
+        dp = response['Datapoints'][-1]['Average']
+    else:
+        dp = -1
+    return { "unhealthycount":dp,"State":state,"alb_arn":albname,"region_name":region_name,"tgtarn":tgtarn,"LoadBalancerName":LoadBalancerName }

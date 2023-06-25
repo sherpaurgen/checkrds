@@ -9,12 +9,12 @@ from dbhandler.db import insert_cpuusage_data
 from dbhandler.db import insert_memfree_data
 from dbhandler.db import create_diskqueuedepth_table,create_elbresponsetime_table
 from dbhandler.db import insert_diskqueuedepth_data,insert_elbresponsetime_data
-from dbhandler.db import truncate_tables
+from dbhandler.db import truncate_tables,create_elbtargetgroup_table,insert_elbtargetgroup_data
 from helpers.utility import get_rds_freeable_memory
 from helpers.utility import get_cpu_usage
 from helpers.utility import list_available_db
 from helpers.utility import get_rds_DiskQueueDepth,get_rds_diskfree
-from helpers.utility import list_elb,getTargetResponseTime
+from helpers.utility import list_elb,getTargetResponseTime,get_target_groups_for_alb,getUnHealthyHostCount
 
 
 def main():
@@ -27,6 +27,7 @@ def main():
     create_cpuusage_table(dbfile)
     create_diskqueuedepth_table(dbfile)
     create_elbresponsetime_table(dbfile)
+    create_elbtargetgroup_table(dbfile)
     truncate_tables(dbfile)
     with open(rds_conf_path, 'r') as fh:
         data = yaml.safe_load(fh)
@@ -113,14 +114,39 @@ def main():
         for item in concurrent.futures.as_completed(elbfut):
             elbdata.append(item.result())
 
-    print(elbdata)
     for item in elbdata:
         insert_elbresponsetime_data(dbfile,item)
 
+    tgtdata = []
+    fut = []
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        for lb in elbseries:
+            fut.append(executor.submit(get_target_groups_for_alb,lb["LoadBalancerArn"], lb["region_name"],lb["LoadBalancerName"],lb['State']))
+        for f in concurrent.futures.as_completed(fut):
+            tgtdata.append(f.result())
+
+    unhealthycount=[]
+    fut = []
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        for item in tgtdata:
+            if item['target_groups']:
+                for tgt in item['target_groups']:
+                    tgtname = 'targetgroup/'+'/'.join(tgt["TargetGroupArn"].split('/')[-2:])
+                    load_balancer_name = '/'.join(item["alb_arn"].split('/')[-3:])
+                    fut.append(executor.submit(getUnHealthyHostCount,tgtname, load_balancer_name, item["region_name"], item['State'],item["LoadBalancerName"]))
+                for f in concurrent.futures.as_completed(fut):
+                    unhealthycount.append(f.result())
+            else:
+                continue
+
+    for x in unhealthycount:
+        insert_elbtargetgroup_data(dbfile,x)
 
     end_time = time.time()
     execution_time = end_time - start_time
     print(f"Elapsed: {execution_time}s")
+
+
 
 if __name__ == '__main__':
     main()
