@@ -3,7 +3,7 @@ from datetime import datetime,timedelta
 
 def list_available_db(region_name,Namespace):
     dblist = []
-    client = boto3.client('rds', region_name="us-east-1")
+    client = boto3.client('rds', region_name=region_name)
     response = client.describe_db_instances()
     for db_instance in response['DBInstances']:
         DBInstanceIdentifier = db_instance["DBInstanceIdentifier"]
