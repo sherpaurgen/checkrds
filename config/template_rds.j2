@@ -1,0 +1,14 @@
+/* * * * * * * * * * * * * * * * */
+
+object Host "{{ hostname }}" {
+    import "generic-host"
+    address = "127.0.0.1"
+    vars.rds = true
+    vars.region_name = "{{ region_name }}"
+    vars.dontping = true
+    vars.dbEngine = "{{ engine }}"
+    check_command = "dummy"
+    enable_active_checks = false
+}
+
+

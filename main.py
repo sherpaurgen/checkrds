@@ -2,6 +2,7 @@ import concurrent.futures
 import time
 import yaml
 import os
+import logging
 from dbhandler.db import create_diskfree_table,insert_diskfree_data
 from dbhandler.db import create_cpuusage_table
 from dbhandler.db import create_memfree_table
@@ -15,12 +16,17 @@ from helpers.utility import get_cpu_usage
 from helpers.utility import list_available_db
 from helpers.utility import get_rds_DiskQueueDepth,get_rds_diskfree
 from helpers.utility import list_elb,getTargetResponseTime,get_target_groups_for_alb,getUnHealthyHostCount
+from helpers.utility import generate_rdshost_file,generate_elbhost_file,truncate_file,reloadIcinga
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
+logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S', level=logging.WARNING)
 
 def main():
+    script_home = os.path.dirname(os.path.abspath(__file__))
     start_time = time.time()
     cwd = os.getcwd()
-    rds_conf_path = cwd + '/config/rds.yaml'
+    conf_path = script_home + '/config/config.yaml'
     dbfile = cwd + '/rds_stat.db'
     create_diskfree_table(dbfile)
     create_memfree_table(dbfile)
@@ -29,13 +35,19 @@ def main():
     create_elbresponsetime_table(dbfile)
     create_elbtargetgroup_table(dbfile)
     truncate_tables(dbfile)
-    with open(rds_conf_path, 'r') as fh:
-        data = yaml.safe_load(fh)
-    Namespace = data["Rds_Namespace"]
+
+    with open(conf_path, 'r') as fh:
+        confdata = yaml.safe_load(fh)
+    rdsNamespace = confdata["Rds_Namespace"]
+    icinga_rds_hostfilepath = confdata["icinga_rds_hostfilepath"]
+    icinga_elb_hostfilepath = confdata["icinga_elb_hostfilepath"]
+    elbhosttemplatepath = confdata["elbhosttemplatepath"]
+    rdshosttemplatepath = confdata["rdshosttemplatepath"]
+
     tmp_alldb = []
 
-    for region in data['Rds_Regions']:
-        tmp_alldb.append(list_available_db(region, Namespace))
+    for region in confdata['Rds_Regions']:
+        tmp_alldb.append(list_available_db(region, rdsNamespace))
     alldb = []
 
     if len(tmp_alldb) > 0:
@@ -90,13 +102,13 @@ def main():
         insert_diskfree_data(dbfile, d) # free disk space is in MB
 
     #------------ELB Monitring Start --------#
-    with open(rds_conf_path, 'r') as fh:
-        data = yaml.safe_load(fh)
-    Namespace = data["Elb_Namespace"]
+    # with open(rds_conf_path, 'r') as fh:
+    #     data = yaml.safe_load(fh)
+    elbNamespace = confdata["Elb_Namespace"]
     tmp_allelb = []
     with concurrent.futures.ThreadPoolExecutor() as executor:
         elbfut=[]
-        for region in data['Elb_Regions']:
+        for region in confdata['Elb_Regions']:
             elbfut.append(executor.submit(list_elb,region))
         for item in concurrent.futures.as_completed(elbfut):
             tmp_allelb.append(item.result())
@@ -109,7 +121,7 @@ def main():
     elbfut=[]
     with concurrent.futures.ThreadPoolExecutor() as executor:
         for elb in elbseries:
-            elb['Namespace'] = Namespace
+            elb['Namespace'] = elbNamespace
             elbfut.append(executor.submit(getTargetResponseTime,**elb))
         for item in concurrent.futures.as_completed(elbfut):
             elbdata.append(item.result())
@@ -134,19 +146,22 @@ def main():
                     tgtname = 'targetgroup/'+'/'.join(tgt["TargetGroupArn"].split('/')[-2:])
                     load_balancer_name = '/'.join(item["alb_arn"].split('/')[-3:])
                     fut.append(executor.submit(getUnHealthyHostCount,tgtname, load_balancer_name, item["region_name"], item['State'],item["LoadBalancerName"]))
-                for f in concurrent.futures.as_completed(fut):
-                    unhealthycount.append(f.result())
             else:
                 continue
-
+        for f in concurrent.futures.as_completed(fut):
+            unhealthycount.append(f.result())
     for x in unhealthycount:
         insert_elbtargetgroup_data(dbfile,x)
 
+    truncate_file(icinga_rds_hostfilepath)
+    truncate_file(icinga_elb_hostfilepath)
+    generate_rdshost_file(icinga_rds_hostfilepath,rdshosttemplatepath,dbfile)
+    generate_elbhost_file(icinga_elb_hostfilepath,elbhosttemplatepath,dbfile)
+    reloadIcinga()
+
     end_time = time.time()
     execution_time = end_time - start_time
-    print(f"Elapsed: {execution_time}s")
-
-
+    logger.warning(f"Elapsed: {execution_time}s")
 
 if __name__ == '__main__':
     main()
