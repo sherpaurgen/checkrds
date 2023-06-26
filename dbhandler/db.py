@@ -186,7 +186,7 @@ def insert_elbresponsetime_data(db_file,data):
 def truncate_tables(db_file):
     conn = sqlite3.connect(db_file)
     cursor = conn.cursor()
-    table_names = ['mem_free','cpu_usage','diskqueuedepth','elbresponsetime','elbtargetgroup']
+    table_names = ['mem_free','disk_free','cpu_usage','diskqueuedepth','elbresponsetime','elbtargetgroup']
     for t in table_names:
         cursor.execute(f"DELETE FROM {t}")
     conn.commit()

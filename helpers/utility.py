@@ -49,7 +49,7 @@ def get_rds_freeable_memory(dataref):
                         ]
                     },
                     'Period': 120,  # Fetch data in 120-second intervals
-                    'Stat': 'Average',  # Compute the average CPU usage
+                    'Stat': 'Average',  # Compute the average mem usage
                 },
             },
         ],
@@ -267,50 +267,59 @@ def getUnHealthyHostCount(tgtarn,albname,region_name,state,LoadBalancerName):
             "Value": albname
         }
     ]
-    response = cloudwatch.get_metric_statistics(
-        Namespace='AWS/ApplicationELB',
-        MetricName='UnHealthyHostCount',
-        Dimensions=dimensions,
-        StartTime=start_time,
-        EndTime=end_time,
-        Period=120,
-        Statistics=['Average']
-    )
+    try:
+        response = cloudwatch.get_metric_statistics(
+            Namespace='AWS/ApplicationELB',
+            MetricName='UnHealthyHostCount',
+            Dimensions=dimensions,
+            StartTime=start_time,
+            EndTime=end_time,
+            Period=120,
+            Statistics=['Average']
+        )
 
-    if response['Datapoints']:
-        dp = response['Datapoints'][-1]['Average']
-    else:
-        dp = -1
-    return { "unhealthycount":dp,"State":state,"alb_arn":albname,"region_name":region_name,"tgtarn":tgtarn,"LoadBalancerName":LoadBalancerName }
-
+        if response['Datapoints']:
+            dp = response['Datapoints'][-1]['Average']
+        else:
+            dp = -1
+        return { "unhealthycount":dp,"State":state,"alb_arn":albname,"region_name":region_name,"tgtarn":tgtarn,"LoadBalancerName":LoadBalancerName }
+    except Exception as e:
+        logger.warning("Error getUnHealthyHostCount "+ str(e))
 def generate_rdshost_file(icingahostfilepath, hosttemplatepath,dbfile):
-    con = sqlite3.connect(dbfile)
-    cursor = con.cursor()
-    cursor.execute('SELECT DBInstanceIdentifier,Engine,region_name FROM cpu_usage')
-    rows = cursor.fetchall()
-    with open(hosttemplatepath, 'r') as file:
-        template_content = file.read()
-    template = Template(template_content)
-    for row in rows:
-        rendered_template = template.render(hostname=row[0], engine=row[1], region_name=row[2])
-        with open(icingahostfilepath, 'a') as output_file:
-            output_file.write(rendered_template)
-    cursor.close()
-    con.close()
+    try:
+        con = sqlite3.connect(dbfile)
+        cursor = con.cursor()
+        cursor.execute('SELECT DBInstanceIdentifier,Engine,region_name FROM cpu_usage')
+        rows = cursor.fetchall()
+        with open(hosttemplatepath, 'r') as file:
+            template_content = file.read()
+        template = Template(template_content)
+        for row in rows:
+            rendered_template = template.render(hostname=row[0], engine=row[1], region_name=row[2])
+            with open(icingahostfilepath, 'a') as output_file:
+                output_file.write(rendered_template)
+        cursor.close()
+        con.close()
+    except Exception as e:
+        logger.warning("Error generate_rdshost_file "+ str(e))
+
 def generate_elbhost_file(icingahostfilepath, hosttemplatepath,dbfile):
-    con = sqlite3.connect(dbfile)
-    cursor = con.cursor()
-    cursor.execute('SELECT LoadBalancerName,DNSName,elbState,region_name FROM elbresponsetime')
-    rows = cursor.fetchall()
-    with open(hosttemplatepath, 'r') as file:
-        template_content = file.read()
-    template = Template(template_content)
-    for row in rows:
-        rendered_template = template.render(hostname=row[0], address=row[1],state=row[2], region_name=row[3])
-        with open(icingahostfilepath, 'a') as output_file:
-            output_file.write(rendered_template)
-    cursor.close()
-    con.close()
+    try:
+        con = sqlite3.connect(dbfile)
+        cursor = con.cursor()
+        cursor.execute('SELECT LoadBalancerName,DNSName,elbState,region_name FROM elbresponsetime')
+        rows = cursor.fetchall()
+        with open(hosttemplatepath, 'r') as file:
+            template_content = file.read()
+        template = Template(template_content)
+        for row in rows:
+            rendered_template = template.render(hostname=row[0], address=row[1],state=row[2], region_name=row[3])
+            with open(icingahostfilepath, 'a') as output_file:
+                output_file.write(rendered_template)
+        cursor.close()
+        con.close()
+    except Exception as e:
+        logger.warning("Error generate_rdshost_file "+ str(e))
 
 def truncate_file(filepath):
     with open(filepath, 'w') as file:
